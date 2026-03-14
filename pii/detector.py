@@ -85,8 +85,9 @@ def _icd_code_recogniser() -> PatternRecognizer:
     return PatternRecognizer(
         supported_entity="ICD_CODE",
         patterns=[
-            # ICD-10: letter + 2 digits + optional dot + 1-2 digits (e.g. S93.4, R07.9)
-            Pattern("ICD10", r"\b[A-Z]\d{2}(?:\.\d{1,2})?\b", 0.8),
+            # ICD-10 code optionally followed by " - description" to end of line.
+            # e.g. "S93.4 - Sprain of ankle (synthetic ICD-10 code)"
+            Pattern("ICD10", r"\b[A-Z]\d{2}(?:\.\d{1,2})?(?:\s*[-–]\s*[A-Za-z][^\n]*)?", 0.8),
         ],
         context=["diagnosis", "icd", "code", "diagnose"],
     )
@@ -217,8 +218,11 @@ def _get_engine() -> AnalyzerEngine:
     return _engine
 
 
-def detect(pages: list[PageText]) -> list[Finding]:
-    """Run PII detection over all pages and return findings with bboxes."""
+def detect(pages: list[PageText], include_diagnoses: bool = False) -> list[Finding]:
+    """Run PII detection over all pages and return findings with bboxes.
+
+    Diagnosis codes (ICD-10) are excluded by default; pass include_diagnoses=True to enable.
+    """
     engine = _get_engine()
     all_findings: list[Finding] = []
 
@@ -305,7 +309,10 @@ def detect(pages: list[PageText]) -> list[Finding]:
                 )
             )
 
-    return _deduplicate(all_findings)
+    findings = _deduplicate(all_findings)
+    if not include_diagnoses:
+        findings = [f for f in findings if f.type != "DIAGNOSIS"]
+    return findings
 
 
 def _build_char_index(chars: list[Char]) -> list[tuple[int, Char]]:

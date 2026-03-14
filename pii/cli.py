@@ -39,6 +39,9 @@ def cli(ctx: click.Context, debug: bool) -> None:
     "--report-file", type=click.Path(path_type=Path), default=None, help="Write audit report to file instead of stdout."
 )
 @click.option("--ocr", is_flag=True, default=False, help="Enable OCR for image-only pages (requires tesseract).")
+@click.option(
+    "--diagnoses", is_flag=True, default=False, help="Also redact diagnosis codes (ICD-10). Disabled by default."
+)
 @click.option("--password", default=None, help="Encryption password (prefer interactive prompt).")
 def redact(
     input_pdf: Path,
@@ -47,6 +50,7 @@ def redact(
     yes: bool,
     report_file: Path | None,
     ocr: bool,
+    diagnoses: bool,
     password: str | None,
 ) -> None:
     """Detect and redact PII from INPUT_PDF. Produces a redacted PDF and an encrypted key file."""
@@ -70,7 +74,7 @@ def redact(
         sys.exit(1)
 
     click.echo("Detecting PII...")
-    findings = detect(pages)
+    findings = detect(pages, include_diagnoses=diagnoses)
 
     if not findings:
         click.echo("No PII detected. No files written.")
