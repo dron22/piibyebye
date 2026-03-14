@@ -34,7 +34,7 @@ Detects PII, shows a summary, asks for confirmation, prompts for a password, the
 --opaque                Use opaque tokens [REDACTED_001] instead of typed [NAME_1]
 --yes, -y               Skip confirmation prompt (for scripting)
 --report-file <path>    Write audit report to file instead of stdout
---ocr                   Enable OCR for scanned/image-only pages (requires tesseract)
+--diagnoses             Also redact diagnosis codes / ICD-10 (disabled by default)
 --password <pwd>        Provide password inline (prefer interactive prompt)
 ```
 
@@ -50,8 +50,8 @@ pii redact invoice.pdf --opaque
 # Scripted use — skip confirmation, provide password inline
 pii redact invoice.pdf --yes --password "my-secret"
 
-# Scanned document with OCR
-pii redact scanned_form.pdf --ocr
+# Include diagnosis codes (ICD-10) in redaction
+pii redact medical_report.pdf --diagnoses
 ```
 
 ### Restore a redacted PDF
@@ -120,7 +120,7 @@ make clean      # remove caches
 ```
 pii/
 ├── cli.py          entry point — click commands
-├── extractor.py    pymupdf text + bbox extraction, OCR
+├── extractor.py    pymupdf text + bbox extraction
 ├── detector.py     Presidio PII detection + custom Swiss recognisers
 ├── reviewer.py     stdout summary + confirmation prompt
 ├── tokeniser.py    token generation and deduplication

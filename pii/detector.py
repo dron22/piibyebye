@@ -45,6 +45,8 @@ def _build_engine() -> AnalyzerEngine:
     registry.add_recognizer(_icd_code_recogniser())
     registry.add_recognizer(_iban_recogniser())
     registry.add_recognizer(_email_recogniser())
+    registry.add_recognizer(_street_address_recogniser())
+    registry.add_recognizer(_postal_code_recogniser())
 
     return AnalyzerEngine(nlp_engine=nlp_engine, registry=registry)
 
@@ -111,6 +113,40 @@ def _email_recogniser() -> PatternRecognizer:
         patterns=[
             Pattern("EMAIL", r"\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b", 0.9),
         ],
+    )
+
+
+def _street_address_recogniser() -> PatternRecognizer:
+    """Matches European street names with house number (e.g. 'Seestrasse 88', 'Rue de la Paix 3')."""
+    return PatternRecognizer(
+        supported_entity="STREET_ADDRESS",
+        patterns=[
+            Pattern(
+                "STREET_DE",
+                r"(?i)\b\w+(?:strasse|gasse|weg|allee|platz|str\.?)\s+\d+[a-z]?\b",
+                0.8,
+            ),
+            Pattern(
+                "STREET_FR",
+                r"(?i)\b(?:rue|avenue|boulevard|chemin|route|impasse|voie)\s+\w[\w\s]{2,30}\b",
+                0.75,
+            ),
+        ],
+        context=["address", "adresse", "street", "wohnort", "domicile"],
+    )
+
+
+def _postal_code_recogniser() -> PatternRecognizer:
+    """Matches Swiss/European 4–5 digit postal codes followed by a city name."""
+    return PatternRecognizer(
+        supported_entity="POSTAL_CODE",
+        patterns=[
+            # Swiss: 4-digit zip + city (e.g. "8002 Zürich")
+            Pattern("POSTAL_CH", r"\b\d{4}\s+\w+\b", 0.75),
+            # DE/AT/FR: 5-digit zip + city
+            Pattern("POSTAL_EU5", r"\b\d{5}\s+\w+\b", 0.75),
+        ],
+        context=["address", "adresse", "zip", "plz", "city", "wohnort", "domicile"],
     )
 
 
@@ -191,6 +227,8 @@ _ENTITY_TO_TOKEN_TYPE = {
     "IBAN_CODE": "IBAN",
     "IBAN": "IBAN",
     "LOCATION": "ADDRESS",
+    "STREET_ADDRESS": "ADDRESS",
+    "POSTAL_CODE": "ADDRESS",
     "AHV": "AHV",
     "INSURANCE_NUM": "INSURANCE",
     "PATIENT_ID": "PATIENT_ID",

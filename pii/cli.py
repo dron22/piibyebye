@@ -38,7 +38,6 @@ def cli(ctx: click.Context, debug: bool) -> None:
 @click.option(
     "--report-file", type=click.Path(path_type=Path), default=None, help="Write audit report to file instead of stdout."
 )
-@click.option("--ocr", is_flag=True, default=False, help="Enable OCR for image-only pages (requires tesseract).")
 @click.option(
     "--diagnoses", is_flag=True, default=False, help="Also redact diagnosis codes (ICD-10). Disabled by default."
 )
@@ -49,7 +48,6 @@ def redact(
     opaque: bool,
     yes: bool,
     report_file: Path | None,
-    ocr: bool,
     diagnoses: bool,
     password: str | None,
 ) -> None:
@@ -66,11 +64,10 @@ def redact(
     key_path = out_dir / f"{stem}_redacted.key.enc"
 
     click.echo(f"Reading {input_pdf.name}...")
-    pages = extract(str(input_pdf), ocr=ocr)
+    pages = extract(str(input_pdf))
 
     if not any(p.chars for p in pages):
         click.echo("Error: no text could be extracted from this PDF.", err=True)
-        click.echo("If this is a scanned document, re-run with --ocr to enable OCR.", err=True)
         sys.exit(1)
 
     click.echo("Detecting PII...")

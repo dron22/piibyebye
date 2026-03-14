@@ -5,9 +5,6 @@ spacy>=3.7
 cryptography>=42
 click>=8.1
 
-# Optional OCR support
-# pytesseract>=0.3
-
 # Dev/test
 pytest>=8
 pytest-cov>=5

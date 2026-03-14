@@ -1,5 +1,7 @@
 """Extract text with character-level bounding boxes from PDF pages."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 import fitz  # pymupdf
@@ -26,31 +28,10 @@ class PageText:
         return not self.text.strip()
 
 
-def extract(pdf_path: str, ocr: bool = False) -> list[PageText]:
-    """Extract text and character bboxes from a PDF.
-
-    For image-only pages, prints a warning unless ocr=True.
-    Returns one PageText per page.
-    """
+def extract(pdf_path: str) -> list[PageText]:
+    """Extract text and character bboxes from a PDF."""
     doc = fitz.open(pdf_path)
-    pages = []
-
-    for page_num, page in enumerate(doc):
-        page_text = _extract_page(page, page_num)
-
-        if page_text.is_empty:
-            if ocr:
-                page_text = _extract_page_ocr(page, page_num)
-            else:
-                import click
-
-                click.echo(
-                    f"Warning: page {page_num + 1} contains no extractable text. "
-                    f"Re-run with --ocr to enable OCR for scanned pages."
-                )
-
-        pages.append(page_text)
-
+    pages = [_extract_page(page, i) for i, page in enumerate(doc)]
     doc.close()
     return pages
 
@@ -74,47 +55,5 @@ def _extract_page(page: fitz.Page, page_num: int) -> PageText:
                         last_bbox = bbox
             # Add newline after each line so PII at line-end gets a word boundary
             page_text.chars.append(Char(text="\n", bbox=last_bbox, page=page_num))
-
-    return page_text
-
-
-def _extract_page_ocr(page: fitz.Page, page_num: int) -> PageText:
-    """Extract text from an image-only page using Tesseract OCR."""
-    try:
-        import io
-
-        import pytesseract
-        from PIL import Image
-    except ImportError:
-        import click
-
-        click.echo(
-            "Error: OCR dependencies not installed. Run: pip install pytesseract pillow",
-            err=True,
-        )
-        return PageText(page_num=page_num)
-
-    page_text = PageText(page_num=page_num)
-
-    # Render page to image at 300 DPI for good OCR quality
-    mat = fitz.Matrix(300 / 72, 300 / 72)
-    pix = page.get_pixmap(matrix=mat)
-    img = Image.open(io.BytesIO(pix.tobytes("png")))
-
-    # Get word-level bboxes from Tesseract (hOCR-style data)
-    data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-    scale_x = page.rect.width / img.width
-    scale_y = page.rect.height / img.height
-
-    for i, word in enumerate(data["text"]):
-        if not word.strip():
-            continue
-        x, y, w, h = data["left"][i], data["top"][i], data["width"][i], data["height"][i]
-        # Convert image coords to PDF points
-        x0, y0 = x * scale_x, y * scale_y
-        x1, y1 = (x + w) * scale_x, (y + h) * scale_y
-        # Treat each word as a sequence of chars sharing the word bbox
-        for char in word:
-            page_text.chars.append(Char(text=char, bbox=(x0, y0, x1, y1), page=page_num))
 
     return page_text
