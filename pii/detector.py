@@ -350,8 +350,24 @@ def _find_font(chars: list[Char], start: int, end: int) -> tuple[str, float]:
     return "helv", 10.0
 
 
+def _bbox_overlap_ratio(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
+    """Return what fraction of the smaller bbox is covered by the intersection."""
+    ix0, iy0 = max(a[0], b[0]), max(a[1], b[1])
+    ix1, iy1 = min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0.0, ix1 - ix0) * max(0.0, iy1 - iy0)
+    if inter == 0.0:
+        return 0.0
+    area_a = (a[2] - a[0]) * (a[3] - a[1])
+    area_b = (b[2] - b[0]) * (b[3] - b[1])
+    smaller = min(area_a, area_b)
+    return inter / smaller if smaller > 0 else 0.0
+
+
+_OVERLAP_THRESHOLD = 0.3  # suppress if 30%+ of the smaller bbox is already covered
+
+
 def _deduplicate(findings: list[Finding]) -> list[Finding]:
-    """Remove exact duplicate findings (same type, value, page, bbox)."""
+    """Remove exact duplicates, then suppress lower-confidence findings with overlapping bboxes."""
     seen: set[tuple] = set()
     unique = []
     for f in findings:
@@ -359,4 +375,11 @@ def _deduplicate(findings: list[Finding]) -> list[Finding]:
         if key not in seen:
             seen.add(key)
             unique.append(f)
-    return unique
+
+    # Greedily accept findings in confidence order; drop any that overlap an accepted one.
+    unique.sort(key=lambda f: f.confidence, reverse=True)
+    accepted: list[Finding] = []
+    for f in unique:
+        if not any(a.page == f.page and _bbox_overlap_ratio(a.bbox, f.bbox) >= _OVERLAP_THRESHOLD for a in accepted):
+            accepted.append(f)
+    return accepted

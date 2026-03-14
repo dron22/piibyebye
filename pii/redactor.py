@@ -53,15 +53,30 @@ def redact_pdf(input_path: str, findings: list[Finding], output_path: str) -> di
         # Permanently remove underlying text and burn black fill into content stream
         page.apply_redactions()
 
-        # Insert token as white text on the black box
+        # Insert token as white text centred inside the black box
         for finding in page_findings:
             if not finding.token:
                 continue
             x0, y0, x1, y1 = finding.bbox
-            box_height = (y1 + _BBOX_PADDING) - (y0 - _BBOX_PADDING)
-            font_size = min(max(box_height * 0.75, 5.0), 9.0)
+            box_w = (x1 + _BBOX_PADDING) - (x0 - _BBOX_PADDING)
+            box_h = (y1 + _BBOX_PADDING) - (y0 - _BBOX_PADDING)
+
+            # Start from height-based size, then shrink to fit width.
+            font_size = min(box_h * 0.75, 9.0)
+            text_w = fitz.get_text_length(finding.token, fontname="helv", fontsize=font_size)
+            if text_w > box_w:
+                font_size *= box_w / text_w
+            font_size = max(font_size, 4.0)
+
+            # Re-measure after possible shrink for horizontal centering.
+            text_w = fitz.get_text_length(finding.token, fontname="helv", fontsize=font_size)
+            x_pos = (x0 + x1) / 2 - text_w / 2
+
+            # Vertical: baseline = box centre + ~35% of font size (cap-height offset).
+            y_pos = (y0 + y1) / 2 + font_size * 0.35
+
             page.insert_text(
-                point=fitz.Point(x0, y1),
+                point=fitz.Point(x_pos, y_pos),
                 text=finding.token,
                 fontsize=font_size,
                 color=(1, 1, 1),
