@@ -1,5 +1,7 @@
+import hashlib
 import logging
 import sys
+import tempfile
 from pathlib import Path
 
 import click
@@ -98,6 +100,72 @@ def redact(
     click.echo(f"  PDF:       {redacted_path.name}")
     click.echo(f"  Key file:  {key_path.name}")
     click.echo("\nKeep your key file safe. Without it, redaction cannot be reversed.")
+
+
+def _redact_for_hook(file_path: str) -> str:
+    """Redact a PDF if not already redacted. Returns the redacted path.
+
+    Redacted files are stored in /tmp/piibyebye/, keyed by SHA-256 of the original,
+    so they are cleaned up by the OS and never clutter the source directory.
+    """
+    file_hash = hashlib.sha256(Path(file_path).read_bytes()).hexdigest()
+    tmp_dir = Path(tempfile.gettempdir()) / "piibyebye"
+    tmp_dir.mkdir(exist_ok=True)
+    redacted_path = tmp_dir / f"{file_hash}.pdf"
+
+    if not redacted_path.exists():
+        pages = extract(file_path)
+        findings = detect(pages)
+        if findings:
+            tokenise(findings)
+            redact_pdf(str(file_path), findings, str(redacted_path))
+
+    return str(redacted_path) if redacted_path.exists() else file_path
+
+
+@cli.command()
+def claude() -> None:
+    """Claude Code PreToolUse hook — redacts PDFs before the model reads them.
+
+    Add to ~/.claude/settings.json:
+
+        "command": "pii claude"
+    """
+    import json
+
+    data = json.load(sys.stdin)
+    file_path = data.get("tool_input", {}).get("file_path", "")
+
+    if data.get("tool_name") != "Read" or not file_path.endswith(".pdf"):
+        return
+
+    redacted_path = _redact_for_hook(file_path)
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow",
+                    "updatedInput": {"file_path": redacted_path},
+                }
+            }
+        )
+    )
+
+
+@cli.command(name="help")
+@click.pass_context
+def help_cmd(ctx: click.Context) -> None:
+    """Show this help message and exit."""
+    click.echo(cli.get_help(ctx))
+
+
+@cli.command()
+def version() -> None:
+    """Show the version and exit."""
+    import importlib.metadata
+
+    click.echo(importlib.metadata.version("piibyebye"))
 
 
 @cli.command()

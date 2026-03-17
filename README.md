@@ -28,6 +28,14 @@ Opens at `http://localhost:7860`. Upload a PDF, review detected fields, download
 
 ---
 
+## AI tool integration
+
+Keep your PDFs private when working with AI coding tools. A hook can automatically redact documents before the model ever sees the content.
+
+- [Claude Code](docs/claude.md)
+
+---
+
 ## Usage
 
 ### Redact a PDF

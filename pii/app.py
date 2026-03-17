@@ -69,7 +69,11 @@ def _unredact(pdf_path: str | None, key_path: str | None, password: str) -> tupl
     return restored_path, f"{n} field(s) restored."
 
 
-with gr.Blocks(title="pii — Local PII Redaction", theme=gr.themes.Default(primary_hue="slate"), js="() => { document.body.classList.add('dark'); }") as demo:
+with gr.Blocks(
+    title="pii — Local PII Redaction",
+    theme=gr.themes.Default(primary_hue="slate"),
+    js="() => { document.body.classList.add('dark'); }",
+) as demo:
     gr.Markdown(
         "# pii — Local PII Redaction\n"
         "Detect and black out personal information from PDFs. "
