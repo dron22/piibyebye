@@ -28,6 +28,14 @@ class Finding:
 
 def _build_engine() -> AnalyzerEngine:
     """Build Presidio AnalyzerEngine with English NER and custom Swiss recognisers."""
+    import subprocess
+    import sys
+
+    import spacy
+
+    if not spacy.util.is_package("en_core_web_lg"):
+        subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_lg"], check=True)
+
     configuration = {
         "nlp_engine_name": "spacy",
         "models": [{"lang_code": "en", "model_name": "en_core_web_lg"}],

@@ -1,4 +1,13 @@
-# pii — Local PII Redaction Tool
+# pii bye bye — Local PII Redaction Tool
+
+```
+ ██████╗ ██╗██╗    ██████╗ ██╗   ██╗███████╗    ██████╗ ██╗   ██╗███████╗
+ ██╔══██╗██║██║    ██╔══██╗╚██╗ ██╔╝██╔════╝    ██╔══██╗╚██╗ ██╔╝██╔════╝
+ ██████╔╝██║██║    ██████╔╝ ╚████╔╝ █████╗      ██████╔╝ ╚████╔╝ █████╗
+ ██╔═══╝ ██║██║    ██╔══██╗  ╚██╔╝  ██╔══╝      ██╔══██╗  ╚██╔╝  ██╔══╝
+ ██║     ██║██║    ██████╔╝   ██║   ███████╗    ██████╔╝   ██║   ███████╗
+ ╚═╝     ╚═╝╚═╝    ╚═════╝    ╚═╝   ╚══════╝    ╚═════╝    ╚═╝   ╚══════╝
+```
 
 Redact personal information from PDFs locally. No data leaves your device.
 
@@ -9,7 +18,7 @@ Detects and blacks out PII fields, produces a redacted PDF, and saves an encrypt
 ## Quick start — Web UI
 
 ```bash
-pip install git+https://github.com/dron22/pii
+pip install piibyebye
 pii web
 ```
 
@@ -110,11 +119,4 @@ The key file is AES-256-GCM encrypted using a password you choose. It maps each 
 
 ```bash
 pip install -e ".[dev]"
-```
-
-```bash
-make test       # run all tests
-make lint       # check formatting, linting, types
-make lint-fix   # auto-fix formatting and lint issues
-make clean      # remove caches
 ```
