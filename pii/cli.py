@@ -171,9 +171,17 @@ def version() -> None:
 @cli.command()
 def web() -> None:
     """Launch the web UI."""
+    import gradio as gr
+
     from pii.app import demo
 
-    demo.launch()
+    _, local_url, _ = demo.launch(
+        theme=gr.themes.Default(primary_hue="slate"),
+        prevent_thread_lock=True,
+        quiet=True,
+    )
+    click.echo(f"* Running on {local_url}?__theme=dark")
+    demo.block_thread()
 
 
 @cli.command()
