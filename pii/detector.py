@@ -26,19 +26,37 @@ class Finding:
     font_size: float = 10.0
 
 
-def _build_engine() -> AnalyzerEngine:
-    """Build Presidio AnalyzerEngine with English NER and custom Swiss recognisers."""
+# Maps ISO 639-1 code → spaCy model package name.
+# English is always loaded; others are loaded when the corresponding pip extra is installed.
+_LANGUAGE_MODELS: dict[str, str] = {
+    "en": "en_core_web_lg",
+    "de": "de_core_news_lg",
+    "fr": "fr_core_news_lg",
+    "it": "it_core_news_lg",
+    "es": "es_core_news_lg",
+}
+
+
+def _build_engine() -> tuple[AnalyzerEngine, set[str]]:
+    """Build Presidio AnalyzerEngine with all installed spaCy models and custom Swiss recognisers.
+
+    Returns the engine and the set of language codes that were loaded.
+    """
     import subprocess
     import sys
 
     import spacy
 
+    # English is always auto-downloaded — it is the base requirement
     if not spacy.util.is_package("en_core_web_lg"):
         subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_lg"], check=True)
 
+    available = {code: name for code, name in _LANGUAGE_MODELS.items() if spacy.util.is_package(name)}
+    log.info("Building NLP engine with languages: %s", sorted(available))
+
     configuration = {
         "nlp_engine_name": "spacy",
-        "models": [{"lang_code": "en", "model_name": "en_core_web_lg"}],
+        "models": [{"lang_code": code, "model_name": name} for code, name in available.items()],
     }
     provider = NlpEngineProvider(nlp_configuration=configuration)
     nlp_engine = provider.create_engine()
@@ -56,7 +74,7 @@ def _build_engine() -> AnalyzerEngine:
     registry.add_recognizer(_street_address_recogniser())
     registry.add_recognizer(_postal_code_recogniser())
 
-    return AnalyzerEngine(nlp_engine=nlp_engine, registry=registry)
+    return AnalyzerEngine(nlp_engine=nlp_engine, registry=registry), set(available)
 
 
 def _ahv_recogniser() -> PatternRecognizer:
@@ -139,8 +157,18 @@ def _street_address_recogniser() -> PatternRecognizer:
                 r"(?i)\b(?:rue|avenue|boulevard|chemin|route|impasse|voie)\s+\w[\w\s]{2,30}\b",
                 0.75,
             ),
+            Pattern(
+                "STREET_IT",
+                r"(?i)\b(?:via|viale|corso|piazza|vicolo)\s+\w[\w\s]{2,30}\b",
+                0.75,
+            ),
+            Pattern(
+                "STREET_ES",
+                r"(?i)\b(?:calle|avenida|paseo|plaza|carrera|camino)\s+\w[\w\s]{2,30}\b",
+                0.75,
+            ),
         ],
-        context=["address", "adresse", "street", "wohnort", "domicile"],
+        context=["address", "adresse", "street", "wohnort", "domicile", "indirizzo", "dirección"],
     )
 
 
@@ -177,7 +205,8 @@ _BIRTH_LABEL_REGEX = re.compile(
     r"(?:date\s+of\s+birth|birthdate|birthday|\bdob\b|\bborn\b"
     r"|geburtsdatum|geburtstag|\bgeboren\b"
     r"|date\s+de\s+naissance|\bnaissance\b|\bn[ée]e?\b"
-    r"|data\s+di\s+nascita|\bnascita\b|\bnato\b|\bnata\b)"
+    r"|data\s+di\s+nascita|\bnascita\b|\bnato\b|\bnata\b"
+    r"|fecha\s+de\s+nacimiento|\bnacimiento\b|\bnacido\b|\bnacida\b)"
     r"[^0-9\n]{0,30}",
     re.IGNORECASE,
 )
@@ -250,14 +279,42 @@ _SUPPORTED_ENTITIES = list(_ENTITY_TO_TOKEN_TYPE.keys())
 
 _engine: Optional[AnalyzerEngine] = None
 _spacy_nlp: Optional[Any] = None
+_available_langs: set[str] = set()
+_lingua_detector: Optional[Any] = None
+
+
+def _build_lingua_detector(lang_codes: set[str]) -> Optional[Any]:
+    """Build a lingua language detector for the installed languages, or None if unavailable."""
+    if len(lang_codes) < 2:
+        return None  # no point detecting with a single model
+    try:
+        from lingua import Language, LanguageDetectorBuilder
+
+        langs = [lang for lang in Language.all() if lang.iso_code_639_1.name.lower() in lang_codes]
+        return LanguageDetectorBuilder.from_languages(*langs).build()
+    except ImportError:
+        return None  # lingua not installed — single-language install, fall back to English
+
+
+def _detect_lang(text: str) -> str:
+    """Return the ISO 639-1 code for the dominant language in text, or 'en' as fallback."""
+    if _lingua_detector is None:
+        return "en"
+    result = _lingua_detector.detect_language_of(text[:2000])
+    detected = result.iso_code_639_1.name.lower() if result else "en"
+    # Guard against detecting a language we don't have a model for
+    return detected if detected in _available_langs else "en"
 
 
 def _get_engine() -> AnalyzerEngine:
-    global _engine, _spacy_nlp
+    global _engine, _spacy_nlp, _available_langs, _lingua_detector
     if _engine is None:
-        _engine = _build_engine()
+        _engine, _available_langs = _build_engine()
+        _lingua_detector = _build_lingua_detector(_available_langs)
         try:
-            # Reuse the spaCy model already loaded by Presidio — avoids a second load
+            # Reuse the English spaCy model for the DOB embedding fallback — the anchor
+            # text is in English so the English model is the right choice regardless of
+            # the document language.
             _spacy_nlp = _engine.nlp_engine.nlp["en"]  # type: ignore[attr-defined]
         except (AttributeError, KeyError):
             pass  # embedding fallback silently disabled
@@ -272,6 +329,12 @@ def detect(pages: list[PageText], include_diagnoses: bool = False) -> list[Findi
     engine = _get_engine()
     all_findings: list[Finding] = []
 
+    # Detect document language once from a combined sample of all pages.
+    # Per-page detection would be noisy on short pages; documents are almost always monolingual.
+    sample = " ".join(p.text[:500] for p in pages if not p.is_empty)
+    lang = _detect_lang(sample)
+    log.debug("Detected document language: %s", lang)
+
     for page in pages:
         if page.is_empty:
             continue
@@ -280,7 +343,7 @@ def detect(pages: list[PageText], include_diagnoses: bool = False) -> list[Findi
         char_index = _build_char_index(page.chars)
 
         # Presidio-based detection (everything except DOB)
-        results = engine.analyze(text=text, language="en", entities=_SUPPORTED_ENTITIES)
+        results = engine.analyze(text=text, language=lang, entities=_SUPPORTED_ENTITIES)
         for result in results:
             value = text[result.start : result.end].strip()
             if not value:

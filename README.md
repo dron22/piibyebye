@@ -1,4 +1,4 @@
-# pii bye bye — Local PII Redaction Tool
+# PII Bye Bye — Local PII Redaction Tool
 
 ```
  ██████╗ ██╗██╗    ██████╗ ██╗   ██╗███████╗    ██████╗ ██╗   ██╗███████╗
@@ -20,7 +20,13 @@ Detects and blacks out PII fields, produces a redacted PDF, and saves an encrypt
 ## Quick start — Web UI
 
 ```bash
+# English only
 pip install piibyebye
+
+# With additional language support (de, fr, it, es — combine freely)
+pip install "piibyebye[de,fr]"
+pip install "piibyebye[all]"
+
 pii web
 ```
 
@@ -143,5 +149,6 @@ pii redact demo/sample_hospital_invoice_synthetic.pdf
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"          # English only
+pip install -e ".[dev,de,fr]"    # with additional languages
 ```

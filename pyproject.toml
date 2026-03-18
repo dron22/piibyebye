@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "piibyebye"
-version = "0.2.5"
+version = "0.3.1"
 description = "Local PII redaction tool for PDFs"
 requires-python = ">=3.10"
 dependencies = [
     "pymupdf>=1.24",
     "presidio-analyzer>=2.2",
     "presidio-anonymizer>=2.2",
-    "spacy>=3.7",
+    "spacy>=3.8",
     "cryptography>=42",
     "click>=8.1",
     "gradio>=4",
@@ -19,6 +19,25 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.4", "mypy>=1.10"]
+# Language extras — install one or more to enable NER in that language.
+# To add a language after initial install, just re-run pip with the new extra, e.g. pip install "piibyebye[fr]"
+de = [
+    "de_core_news_lg @ https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl",
+    "lingua-language-detector>=2.0",
+]
+fr = [
+    "fr_core_news_lg @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_lg-3.8.0/fr_core_news_lg-3.8.0-py3-none-any.whl",
+    "lingua-language-detector>=2.0",
+]
+it = [
+    "it_core_news_lg @ https://github.com/explosion/spacy-models/releases/download/it_core_news_lg-3.8.0/it_core_news_lg-3.8.0-py3-none-any.whl",
+    "lingua-language-detector>=2.0",
+]
+es = [
+    "es_core_news_lg @ https://github.com/explosion/spacy-models/releases/download/es_core_news_lg-3.8.0/es_core_news_lg-3.8.0-py3-none-any.whl",
+    "lingua-language-detector>=2.0",
+]
+all = ["piibyebye[de,fr,it,es]"]
 
 [project.scripts]
 pii = "pii.cli:cli"
