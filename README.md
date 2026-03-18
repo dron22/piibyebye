@@ -152,3 +152,9 @@ pii redact demo/sample_hospital_invoice_synthetic.pdf
 pip install -e ".[dev]"          # English only
 pip install -e ".[dev,de,fr]"    # with additional languages
 ```
+
+---
+
+## License
+
+[MIT](LICENSE)
